@@ -1,0 +1,172 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 780" font-family="Inter, Helvetica Neue, Arial, sans-serif">
+
+  <defs>
+    <style>
+      .zone-label   { font-size: 13px; font-weight: 700; letter-spacing: 1.4px; }
+      .zone-cidr    { font-size: 12px; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+      .host-name    { font-size: 13px; font-weight: 600; }
+      .host-ip      { font-size: 11.5px; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+      .iface        { font-size: 10.5px; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+      .title        { font-size: 22px; font-weight: 700; fill: #16202c; }
+      .subtitle     { font-size: 12.5px; fill: #6b7c8f; }
+      .meta         { font-size: 10.5px; fill: #8b9aab; }
+      .legend       { font-size: 11px; fill: #4a5b6d; }
+      .switch-label { font-size: 10px; font-family: 'SF Mono', Menlo, Consolas, monospace; fill: #7c8ba0; }
+      .ghost-name   { font-size: 12px; font-weight: 500; fill: #9aa8b8; }
+      .blocked      { font-size: 11.5px; font-weight: 700; }
+      .blocked-sub  { font-size: 10.5px; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+    </style>
+
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c8ba0"/>
+    </marker>
+  </defs>
+
+  <rect width="1100" height="780" fill="#f7f9fb"/>
+
+  <!-- ══ Cabecera ══ -->
+  <text x="60" y="56" class="title">Lab 01 — Network segmentation</text>
+  <text x="60" y="78" class="subtitle">Multi-homed router with three isolated segments · VirtualBox / Debian 13 Trixie</text>
+  <text x="1040" y="56" class="meta" text-anchor="end">Session 1 · State: forwarding disabled</text>
+  <text x="1040" y="72" class="meta" text-anchor="end">net.ipv4.ip_forward = 0</text>
+  <line x1="60" y1="96" x2="1040" y2="96" stroke="#dde4ec" stroke-width="1"/>
+
+  <!-- ══ Internet ══ -->
+  <g transform="translate(470,120)">
+    <rect width="160" height="42" rx="21" fill="#eef2f7" stroke="#c6d1de" stroke-width="1.2"/>
+    <text x="80" y="26" text-anchor="middle" class="host-name" fill="#5a6b7e">INTERNET</text>
+  </g>
+
+  <!-- Enlace Internet -> NAT -->
+  <line x1="550" y1="162" x2="550" y2="192" stroke="#c6d1de" stroke-width="1.6"/>
+
+  <!-- ══ NAT VirtualBox ══ -->
+  <g transform="translate(420,192)">
+    <rect width="260" height="52" rx="8" fill="#ffffff" stroke="#c6d1de" stroke-width="1.4" stroke-dasharray="5 4"/>
+    <text x="130" y="23" text-anchor="middle" class="host-name" fill="#5a6b7e">NAT VirtualBox</text>
+    <text x="130" y="40" text-anchor="middle" class="host-ip" fill="#5a6b7e">10.0.2.0/24 · gw 10.0.2.2 · dns 10.0.2.3</text>
+  </g>
+
+  <!-- Enlace NAT -> router -->
+  <line x1="550" y1="244" x2="550" y2="286" stroke="#8b9aab" stroke-width="1.8"/>
+  <rect x="500" y="256" width="100" height="18" rx="4" fill="#f7f9fb"/>
+  <text x="550" y="269" text-anchor="middle" class="iface" fill="#5a6b7e">enp0s3 · dhcp</text>
+
+  <!-- ══ ROUTER ══ -->
+  <g transform="translate(370,286)">
+    <rect width="360" height="96" rx="10" fill="#16202c"/>
+    <text x="24" y="34" class="host-name" fill="#ffffff">lab-router</text>
+    <text x="24" y="53" class="host-ip" fill="#9fb2c6">Debian 13 · NetworkManager</text>
+
+    <!-- Indicador de forwarding desactivado -->
+    <g transform="translate(212,20)">
+      <rect width="126" height="40" rx="6" fill="#2b1a18" stroke="#b3261e" stroke-width="1.2"/>
+      <text x="63" y="17" text-anchor="middle" class="blocked" fill="#ff6b5e">NO FORWARDING</text>
+      <text x="63" y="31" text-anchor="middle" class="blocked-sub" fill="#e08b83">ip_forward = 0</text>
+    </g>
+
+    <!-- Pastillas de interfaz -->
+    <g transform="translate(24,66)">
+      <rect width="96" height="20" rx="4" fill="#243447"/>
+      <text x="48" y="14" text-anchor="middle" class="iface" fill="#a8c4e0">enp0s8</text>
+    </g>
+    <g transform="translate(132,66)">
+      <rect width="96" height="20" rx="4" fill="#243447"/>
+      <text x="48" y="14" text-anchor="middle" class="iface" fill="#a8d8b9">enp0s9</text>
+    </g>
+    <g transform="translate(240,66)">
+      <rect width="96" height="20" rx="4" fill="#243447"/>
+      <text x="48" y="14" text-anchor="middle" class="iface" fill="#e8bfa0">enp0s10</text>
+    </g>
+  </g>
+
+  <!-- ══ Bajantes a cada segmento ══ -->
+  <path d="M 442 382 L 442 410 L 190 410 L 190 448" fill="none" stroke="#3d6b9e" stroke-width="1.8"/>
+  <path d="M 550 382 L 550 448" fill="none" stroke="#2f7d51" stroke-width="1.8"/>
+  <path d="M 658 382 L 658 410 L 910 410 L 910 448" fill="none" stroke="#a15c1e" stroke-width="1.8"/>
+
+  <text x="316" y="402" text-anchor="middle" class="host-ip" fill="#3d6b9e">10.10.10.1/24</text>
+  <text x="560" y="424" text-anchor="start" class="host-ip" fill="#2f7d51">10.10.20.1/24</text>
+  <text x="784" y="402" text-anchor="middle" class="host-ip" fill="#a15c1e">10.10.30.1/24</text>
+
+  <!-- ══ ZONA USERS ══ -->
+  <g transform="translate(60,448)">
+    <rect width="260" height="230" rx="10" fill="#eaf1f9" stroke="#3d6b9e" stroke-width="1.4"/>
+    <rect width="260" height="30" rx="10" fill="#3d6b9e"/>
+    <rect y="16" width="260" height="14" fill="#3d6b9e"/>
+    <text x="16" y="20" class="zone-label" fill="#ffffff">USERS</text>
+    <text x="244" y="20" text-anchor="end" class="zone-cidr" fill="#c9ddf2">10.10.10.0/24</text>
+
+    <!-- switch virtual -->
+    <line x1="130" y1="30" x2="130" y2="58" stroke="#3d6b9e" stroke-width="1.6"/>
+    <rect x="34" y="58" width="192" height="22" rx="4" fill="#dbe8f5" stroke="#3d6b9e" stroke-width="1"/>
+    <text x="130" y="73" text-anchor="middle" class="switch-label" fill="#2b5580">intnet-users</text>
+    <line x1="130" y1="80" x2="130" y2="104" stroke="#3d6b9e" stroke-width="1.6"/>
+
+    <!-- host activo -->
+    <rect x="34" y="104" width="192" height="58" rx="7" fill="#ffffff" stroke="#3d6b9e" stroke-width="1.4"/>
+    <circle cx="50" cy="122" r="4" fill="#2f7d51"/>
+    <text x="62" y="126" class="host-name" fill="#16202c">ws-user01</text>
+    <text x="50" y="144" class="host-ip" fill="#4a5b6d">10.10.10.10/24</text>
+    <text x="50" y="156" class="host-ip" fill="#4a5b6d">gw 10.10.10.1 · enp0s3</text>
+
+    <!-- host futuro -->
+    <rect x="34" y="174" width="192" height="38" rx="7" fill="none" stroke="#a9c1da" stroke-width="1.2" stroke-dasharray="4 4"/>
+    <text x="130" y="197" text-anchor="middle" class="ghost-name">ws-user02 · planned</text>
+  </g>
+
+  <!-- ══ ZONA SERVERS ══ -->
+  <g transform="translate(420,448)">
+    <rect width="260" height="230" rx="10" fill="#e9f4ed" stroke="#2f7d51" stroke-width="1.4"/>
+    <rect width="260" height="30" rx="10" fill="#2f7d51"/>
+    <rect y="16" width="260" height="14" fill="#2f7d51"/>
+    <text x="16" y="20" class="zone-label" fill="#ffffff">SERVERS</text>
+    <text x="244" y="20" text-anchor="end" class="zone-cidr" fill="#c6e6d4">10.10.20.0/24</text>
+
+    <line x1="130" y1="30" x2="130" y2="58" stroke="#2f7d51" stroke-width="1.6"/>
+    <rect x="34" y="58" width="192" height="22" rx="4" fill="#d8ecdf" stroke="#2f7d51" stroke-width="1"/>
+    <text x="130" y="73" text-anchor="middle" class="switch-label" fill="#215a3a">intnet-servers</text>
+    <line x1="130" y1="80" x2="130" y2="104" stroke="#2f7d51" stroke-width="1.6" stroke-dasharray="4 4"/>
+
+    <rect x="34" y="104" width="192" height="38" rx="7" fill="none" stroke="#9dc6ad" stroke-width="1.2" stroke-dasharray="4 4"/>
+    <text x="130" y="127" text-anchor="middle" class="ghost-name">srv-files · Session 3</text>
+
+    <rect x="34" y="154" width="192" height="38" rx="7" fill="none" stroke="#9dc6ad" stroke-width="1.2" stroke-dasharray="4 4"/>
+    <text x="130" y="177" text-anchor="middle" class="ghost-name">srv-log · Session 3</text>
+  </g>
+
+  <!-- ══ ZONA DMZ ══ -->
+  <g transform="translate(780,448)">
+    <rect width="260" height="230" rx="10" fill="#fcf0e6" stroke="#a15c1e" stroke-width="1.4"/>
+    <rect width="260" height="30" rx="10" fill="#a15c1e"/>
+    <rect y="16" width="260" height="14" fill="#a15c1e"/>
+    <text x="16" y="20" class="zone-label" fill="#ffffff">DMZ</text>
+    <text x="244" y="20" text-anchor="end" class="zone-cidr" fill="#f0d3b8">10.10.30.0/24</text>
+
+    <line x1="130" y1="30" x2="130" y2="58" stroke="#a15c1e" stroke-width="1.6"/>
+    <rect x="34" y="58" width="192" height="22" rx="4" fill="#f5e0cc" stroke="#a15c1e" stroke-width="1"/>
+    <text x="130" y="73" text-anchor="middle" class="switch-label" fill="#7a4415">intnet-dmz</text>
+    <line x1="130" y1="80" x2="130" y2="104" stroke="#a15c1e" stroke-width="1.6" stroke-dasharray="4 4"/>
+
+    <rect x="34" y="104" width="192" height="38" rx="7" fill="none" stroke="#d4ab86" stroke-width="1.2" stroke-dasharray="4 4"/>
+    <text x="130" y="127" text-anchor="middle" class="ghost-name">dmz-web · Session 4</text>
+  </g>
+
+  <!-- ══ Leyenda ══ -->
+  <g transform="translate(60,706)">
+    <circle cx="6" cy="10" r="4" fill="#2f7d51"/>
+    <text x="18" y="14" class="legend">VM running</text>
+
+    <rect x="126" y="4" width="20" height="12" rx="3" fill="none" stroke="#9aa8b8" stroke-width="1.2" stroke-dasharray="4 4"/>
+    <text x="154" y="14" class="legend">VM planned (not deployed)</text>
+
+    <line x1="340" y1="10" x2="368" y2="10" stroke="#8b9aab" stroke-width="1.8"/>
+    <text x="378" y="14" class="legend">Active link</text>
+
+    <rect x="470" y="2" width="14" height="14" rx="3" fill="#2b1a18" stroke="#b3261e" stroke-width="1"/>
+    <text x="492" y="14" class="legend">Forwarding disabled (Session 2: NAT)</text>
+  </g>
+
+  <text x="1040" y="748" text-anchor="end" class="meta">Module 1 — Networking for security</text>
+
+</svg>

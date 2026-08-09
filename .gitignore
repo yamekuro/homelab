@@ -1,0 +1,13 @@
+# Keys and secrets
+*.key
+*.pem
+id_*
+*.nmconnection
+
+# Disk images
+*.vdi
+*.ova
+*.qcow2
+
+# System
+.DS_Store
