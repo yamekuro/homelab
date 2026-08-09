@@ -2,7 +2,7 @@
 
 **Environment:** VirtualBox on Windows 11 · Debian 13 (Trixie) · NetworkManager
 **State:** Session 1 — segments operational, inter-segment forwarding disabled
-**Date:** _(fill in)_
+**Date:** 2026-08-08 (lab) · 2026-08-09 (evidence collection)
 
 ---
 

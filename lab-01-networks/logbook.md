@@ -4,8 +4,8 @@
 
 ## Session 1 — Three isolated segments without forwarding
 
-**Date:** _(fill in)_
-**Duration:** _(fill in)_
+**Date:** 2026-08-08 (lab) · 2026-08-09 (evidence collection)
+**Duration:** ~4 h across two sessions
 **Module:** 1 — Networking for security
 
 ### Objective
@@ -61,16 +61,152 @@ All three segments operational. Ping behaviour as predicted: `10.10.10.1` and `1
 
 **Takeaway:** `nmcli` accepts abbreviations (`nmcli con add`, `nmcli c s`), which reduces the error surface. Measure adopted: work over SSH from the macOS laptop instead of the VirtualBox console, or enable bidirectional clipboard. A typo is not a comprehension failure, but it consumes real time and is eliminated with the right tooling.
 
+#### Failure 4 — Misreading `ip -br addr` output
+
+**Symptom:** `enp0s8` appeared to have lost its `10.10.10.1/24`, showing only an IPv6 link-local address.
+
+**Cause:** none. The address was present all along. `ip -br addr` prints all addresses of an interface on a single line, and with a narrow terminal the IPv4 entry was pushed out of view behind the longer IPv6 string.
+
+**Takeaway:** the abbreviated view is for scanning, not for concluding. When something appears to be missing, confirm with `ip addr show <iface>` before diagnosing. A summary format can lie by omission, and acting on that misreading costs more time than the verification would have.
+
+#### Failure 5 — Flushing the ARP cache does not keep it empty
+
+**Symptom:** after `sudo ip neigh flush all`, the entry for `10.10.10.1` reappeared immediately as `REACHABLE` without any ping being issued.
+
+**Cause:** `10.10.10.1` is the client's default gateway. Any background traffic destined outside the local subnet needs the gateway's MAC, so the first such packet triggers a fresh ARP resolution within milliseconds.
+
+**Takeaway:** ARP traffic toward a gateway is continuous, not event-driven. The capture confirmed it: 20 packets over five minutes, with requests every 25–45 seconds as the kernel revalidated the neighbour entry. This establishes a baseline. In ARP spoofing the anomaly is not the volume of resolution traffic but a *change in the MAC* bound to an IP, and that is only detectable against a known-normal pattern.
+
+#### Failure 6 — Cloned VMs share SSH host keys
+
+**Symptom:** connecting from the router to the client, SSH warned the host key was already known under a different address. The fingerprint `SHA256:Crmu64tgD/KmPV9unUYupdvyv82Q6gFyjYyJqpYPIJg` was identical for both `10.10.10.1` and `10.10.10.10`.
+
+**Cause:** both VMs are clones of the same base image and inherited its `/etc/ssh/ssh_host_*` keys.
+
+**Takeaway:** a host key exists so a client can distinguish a server from an impostor. Duplicated across machines, that guarantee is void. Regenerating host keys must be a mandatory post-clone step:
+
+    sudo rm /etc/ssh/ssh_host_*
+    sudo dpkg-reconfigure openssh-server
+
+Related finding: `PasswordAuthentication no`, hardened on the base image in Session 1, was inherited by both clones and blocked file transfer between them. The hardening applied its policy without distinguishing legitimate access from illegitimate. Resolved by temporarily enabling password auth on the router, installing a key with `ssh-copy-id`, then closing it again and verifying the effective config with `sshd -T`.
+
+#### Failure 7 — Cached credentials survive a password change
+
+**Symptom:** SMB authentication from macOS to the Windows host kept failing with `Authentication error` even after the Microsoft account password had been reset.
+
+**Cause:** Windows validates SMB against a locally cached credential. Changing the password at the identity provider does not invalidate that cache until a login refreshes it. The machine was still authenticating against the old password.
+
+**Takeaway:** in any federated authentication setup — Microsoft account, Active Directory, SAML IdP — the credential lives at the provider but the endpoint keeps a local copy for offline use. Resolved by logging out of Windows and back in with the new password. This is the underlying cause of a common help-desk ticket: "I reset the user's password and they still cannot reach the share."
+
+#### Failure 8 — Transcription errors and session context drift
+
+**Symptom:** roughly six command failures across the session, all of the same two families: misplaced whitespace (`date - Is`, `NAME, DEVICE`, `~./ssh`) and wrong paths (`/etc/ssh/sshd/sshd_config`, missing `-` in `find -type f`). Separately, two commands were issued on the wrong machine — once from the router believing it was the client, and once in a window *titled* `ws-user01` that held an open SSH session to the router.
+
+**Cause:** manual transcription of long commands into the VirtualBox graphical console without a clipboard, and reliance on the window title rather than the prompt to identify the working host.
+
+**Takeaway:** neither family is a comprehension failure, but both consume real time and break working rhythm. Measures: enable bidirectional clipboard or work over SSH; use tab completion, which doubles as a path check — if it does not complete, the path does not exist; and run `hostname` before any command whose effect depends on which machine executes it. The window title identifies the VM, not the shell's location. Once SSH is involved, those two decouple — and in a datacentre with jump hosts and nested sessions, the prompt is the only reliable source.
+
 ---
 
-### Concept consolidated
+### Concepts consolidated
 
-A router with an interface in each network **replies** from all of its addresses without needing any forwarding at all, because each one is a local address of its own. `ip_forward` does not control whether the router speaks; it controls whether it **relays conversations between others**. These are two distinct capabilities, and conflating them leads to misdiagnosis.
+#### Why segment at all
 
-Operational corollary: a device replying to ping on a network does not imply it is routing traffic toward that network.
+A flat network is a single broadcast domain: every host sees every other host's ARP traffic and can reach any of them without passing a control point. During an intrusion that turns a compromised user laptop into direct access to the servers.
+
+Segmentation does not prevent the intrusion. It constrains the **lateral movement that follows**, which is the factor deciding whether an incident is one reimaged machine or a week of response work. The three zones map to exposure level: USERS is likely to be compromised first and holds little intrinsic value; SERVERS is low-exposure and high-value; DMZ is exposed by design and therefore assumed compromisable.
+
+The readable third octet (`10.10.**10**.x`, `10.10.**20**.x`, `10.10.**30**.x`) is a deliberate choice: zone membership becomes legible at a glance in any log, capture or firewall rule. That readability is worth more than address-space efficiency.
+
+#### Debian 13 uses NetworkManager, not ifupdown
+
+Editing `/etc/network/interfaces` has no effect on Trixie. Configuration goes through `nmcli`, and profiles live in `/etc/NetworkManager/system-connections/`.
+
+The general lesson is larger than the specific tool: verify which subsystem actually manages a service before editing config files for it. A file can be edited successfully, saved successfully, and ignored completely.
+
+#### The gateway asymmetry is the essence of routing
+
+Only one default route can exist per routing table. The router learns its own via DHCP on the NAT leg. Its three internal legs are **directly connected** networks — the kernel generates those routes automatically on address assignment, and nothing needs to tell it where to hand that traffic.
+
+Setting a gateway on multiple interfaces is the classic mistake here. NetworkManager accepts the instruction; the result is competing default routes and intermittent connectivity depending on which wins on metric.
+
+The client is the mirror image: one interface, one gateway, because everything outside its own subnet goes to `10.10.10.1`. Router without an internal gateway, client with one.
+
+#### Replying is not routing
+
+A router with an interface in each network **replies** from all of its addresses without any forwarding at all, because each one is a local address of its own. `ip_forward` does not control whether the router speaks; it controls whether it **relays conversations between others**.
+
+Operational corollary: a device replying to ping on a network does not imply it is routing traffic toward that network. Confirmed empirically — an `scp` transfer completed across the USERS segment with `ip_forward = 0`, because both endpoints sat in the same broadcast domain.
+
+#### Cloning propagates more than disk contents
+
+Three inherited artefacts caused problems across the two sessions:
+
+- **MAC addresses.** Selecting *Generate new MAC addresses for all network adapters* is mandatory. Duplicate MACs on one segment cause intermittent ARP conflicts — the kind that work for a while and then stop for no visible reason, which is harder to diagnose than a clean failure.
+- **Orphaned NetworkManager profiles.** `Wired connection 1` survived cloning, inactive, showing `--` under DEVICE. Harmless until the intended profile fails to come up, at which point an `autoconnect` profile can activate itself and hand you a configuration different from the one you believe is applied.
+- **SSH host keys.** Both clones presented the identical fingerprint. A host key exists so a client can distinguish a server from an impostor; duplicated, that guarantee is void.
+
+A clone is not a new machine until its identity has been regenerated.
+
+#### Reading a routing table
+
+Every line states who wrote it and why the destination is reachable:
+
+    default via 10.0.2.2 dev enp0s3 proto dhcp src 10.0.2.15 metric 104
+    10.10.10.0/24 dev enp0s8 proto kernel scope link src 10.10.10.1 metric 103
+
+- `proto kernel` — generated automatically when the address was assigned. Not one route on this router was written by hand.
+- `proto dhcp` — learned from a DHCP server.
+- `proto static` — configured deliberately, as on the client via the `ws-lan` profile.
+- `scope link` — reachable directly over this interface, no intermediary.
+- `src` — the source address this host will use toward that network.
+
+#### ARP has a baseline, and the baseline is what makes attacks visible
+
+A five-minute capture on the USERS segment yielded 20 packets, not the single request/reply pair expected. Three distinct behaviours were present:
+
+1. **Resolution on demand.** `Request who-has 10.10.10.1 tell 10.10.10.10` followed by a unicast reply 13 microseconds later — an order of magnitude faster than the ICMP that follows, because it never leaves layer 2.
+2. **Periodic revalidation.** Requests every 25–45 seconds, unprompted. The kernel ages neighbour entries and re-resolves the gateway continuously. Flushing the cache does not keep it empty: a default gateway entry reappears within milliseconds, because any outbound background traffic needs it.
+3. **Reverse resolution.** The router querying the client. ARP is bidirectional; the router maintains its own neighbour table with its own timers.
+
+Why this matters for detection: ARP spoofing does not announce itself through traffic volume. Resolution traffic toward a gateway is constant and normal. The anomaly is a **change in the MAC bound to an IP**, or replies nobody solicited. Neither is detectable without knowing what normal looks like on that segment. This capture is that reference.
+
+#### Layered connectivity diagnosis
+
+Work outward from the host; the first failing step localises the problem:
+
+    ip addr        → does the interface have an address?
+    ip route       → is there a route to the destination?
+    ping gateway   → does the next hop answer?
+    ping 8.8.8.8   → is there external reachability?
+    ping a domain  → if the previous worked and this fails, it is DNS
+
+Applied twice: it found the router's NAT leg without an address (inactive profile), and confirmed correct state after reactivation.
+
+The corresponding skill is reading **who** emits an error, not only what it says. `Destination Host Unreachable` on a local network is generated by the *source* machine when nobody answers its ARP request — a loud, local failure. A packet dropped by a router with `ip_forward = 0` produces **nothing at all** — a silent, remote failure. That distinction places the fault on one side of the link or the other before touching any configuration.
+
+#### Temporary relaxation of a hardened control
+
+Transferring a file between the two clones required temporarily reversing the SSH hardening applied in Session 1. The procedure matters more than the outcome:
+
+1. **Open** — `PasswordAuthentication yes`, `systemctl restart ssh`
+2. **Verify the service survived** — `systemctl is-active ssh`. A syntax error in the config leaves no SSH at all.
+3. **Use** — `ssh-copy-id` to install the key, then `scp`
+4. **Close** — revert to `no`, restart
+5. **Verify the effective state** — `sshd -T | grep passwordauthentication`
+
+Step 5 is the one that gets skipped. `grep` on the config file shows what a file says; `sshd -T` shows what the daemon has **loaded**. They diverge whenever an edit was made without a restart, and that gap is exactly what an audit finds.
+
+The broader observation: the hardening worked. It blocked a transfer I wanted to make, because a control cannot distinguish legitimate access from illegitimate — it only applies policy. That tension between security posture and operational need is the substance of the job, not a laboratory artefact.
+
+#### Credentials cached at the endpoint
+
+In federated authentication — Microsoft account, Active Directory, SAML IdP — the credential lives at the provider, but the endpoint keeps a local copy so it can authenticate you offline. Changing the password at the provider does not invalidate that cache until a login refreshes it.
+
+This is the underlying cause of a common help-desk ticket: *"I reset the user's password and they still cannot reach the share."* The fix is a full logout and login with the new password, not a further password reset.
 
 ### Outstanding
 
-- [ ] Export both VM configurations to `configs/`
-- [ ] Save the ARP capture to `captures/`
+- [x] Export both VM configurations to `configs/`
+- [x] Save the ARP capture to `captures/`
 - [ ] Session 2: enable `ip_forward`, NAT with nftables, verify TTL 63
