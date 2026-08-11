@@ -106,6 +106,43 @@ Related finding: `PasswordAuthentication no`, hardened on the base image in Sess
 
 **Takeaway:** neither family is a comprehension failure, but both consume real time and break working rhythm. Measures: enable bidirectional clipboard or work over SSH; use tab completion, which doubles as a path check — if it does not complete, the path does not exist; and run `hostname` before any command whose effect depends on which machine executes it. The window title identifies the VM, not the shell's location. Once SSH is involved, those two decouple — and in a datacentre with jump hosts and nested sessions, the prompt is the only reliable source.
 
+#### Failure 9 — Host key regeneration and orphaned authorised keys
+
+**Context:** closing the item flagged in Failure 6. Both clones presented the identical Ed25519 host fingerprint `SHA256:Crmu64tgD/…`, with the comment `root@deb-lab01` — the hostname of the base template, still embedded in the key. All six host key files carried the same creation timestamp, from before the clone.
+
+**Procedure:**
+
+    sudo rm /etc/ssh/ssh_host_*
+    sudo dpkg-reconfigure openssh-server
+
+Result — each machine now has its own identity:
+
+| Machine | Ed25519 fingerprint | Comment |
+|---|---|---|
+| before (both) | `Crmu64tgD/KmPV9unUYupdvyv82Q6gFyjYyJqpYPIJg` | `root@deb-lab01` |
+| `lab-router` | `x9VbScfYBS+h68I4iSOazvOBYpDkSOXjFT/m37ZXOHY` | `root@lab-router` |
+| `ws-user01` | `c5E+knUxs11SGy2PfMeI13fnyaN6eJxhMCDFNdE1o1s` | `root@ws-user01` |
+
+**Trap encountered:** `dpkg-reconfigure` detected the locally modified `sshd_config` and offered to install the maintainer's version. Accepting would have silently reverted the Session 1 hardening — `PermitRootLogin no`, `PasswordAuthentication no`, `MaxAuthTries 3`. Selecting *keep the local version currently installed* preserved it, confirmed afterwards with `sshd -T`. The same prompt appears during ordinary `apt upgrade` runs, in the middle of long output, where pressing Enter reflexively can undo controls that took effort to apply.
+
+**Follow-on: orphaned authorised keys.** A user key on `ws-user01` had an unrecoverable passphrase and was replaced. The old public key remained in the router's `authorized_keys`, and both entries carried the identical comment `ws-user01-to-router` — indistinguishable from each other. Inspecting the file revealed three keys, not the two visible with `tail -2`.
+
+The passphrase was not recoverable — the private key is encrypted with it, and there is no mechanism to retrieve it. Regenerating was the correct response rather than an attempt at recovery: the key granted access between two isolated lab VMs, so its replacement cost nothing. The judgement is about scope, not effort — a key protecting a GitHub account or a production bastion warrants a passphrase in the first place; one used between two internal machines does not.
+
+Installing the replacement required the same open/use/close cycle as before, since `PasswordAuthentication no` blocks `ssh-copy-id` by design. A direct copy-paste between the two VM consoles failed: VirtualBox's shared clipboard bridges host-to-guest, not guest-to-guest, so any transfer between VMs has to pass through the host.
+
+Removing the orphan:
+
+    cut -d' ' -f3 ~/.ssh/authorized_keys    # list comments only
+    grep -n "PRkhT2dpo1lOFWV" ~/.ssh/authorized_keys   # identify by key material, not comment
+    cp ~/.ssh/authorized_keys{,.bak}        # back up before editing
+    sed -i '2d' ~/.ssh/authorized_keys      # remove the identified line
+    chmod 600 ~/.ssh/authorized_keys        # sshd ignores the file if permissions are looser
+
+**Takeaway:** a key comment is free text and guarantees nothing. To manage `authorized_keys` at all, comments must identify user, machine and date (`alexis@ws-user01-2026-08`), or entries become unrevocable — nobody can say which one to remove. An unused authorised key is standing access nobody is tracking, which is precisely what an access review looks for. Always inspect the whole file before editing, and back it up: this file governs who can enter the machine, and `sed -i` has no undo.
+
+**Also noted:** `ss -tlnp | grep :22` shows the router listening on `0.0.0.0:22` and `[::]:22` — SSH is reachable on all four interfaces, including the external leg, over both IP versions. To be constrained in Session 2 via `ListenAddress` or firewall rules, and a reminder that IPv4-only rules leave the IPv6 plane untouched.
+
 ---
 
 ### Concepts consolidated
