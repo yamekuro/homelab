@@ -91,10 +91,10 @@ Check `packets dropped by kernel` on exit. Anything above zero means the buffer 
 **Client config in `~/.ssh/config`** — which key to use per host:
 
     Host github.com
-        HostName github.com
-        User git
-        IdentityFile ~/.ssh/id_ed25519_github
-        IdentitiesOnly yes
+       HostName github.com
+       User git
+       IdentityFile ~/.ssh/id_ed25519_github
+       IdentitiesOnly yes
 
 `IdentitiesOnly yes` matters: without it the client offers every key it finds, and the server can reject you for too many attempts. The file must be `chmod 600` or SSH ignores it.
 
@@ -180,6 +180,42 @@ When cloning, always select **Generate new MAC addresses for all network adapter
 Shared folders mount at `/media/sf_<name>` and require membership of the `vboxsf` group. Ownership and permissions there are imposed by the VirtualBox driver, not the guest kernel — which is why `usermod -aG vboxsf` is required despite the copy being made by your user.
 
 Guest Additions are required for shared folders and bidirectional clipboard. Enable the clipboard via **Devices → Shared Clipboard → Bidirectional**; it removes an entire class of transcription errors.
+
+### Post-clone procedure
+
+A clone is not a new machine until its inherited identity has been replaced. Four steps, all of them mandatory:
+
+**1. Regenerate MAC addresses** — at clone time, select *Generate new MAC addresses for all network adapters*. Duplicate MACs on one segment cause intermittent ARP conflicts, which are harder to diagnose than clean failures.
+
+**2. Set the hostname**
+
+    sudo hostnamectl set-hostname <name>
+    sudo nano /etc/hosts        # update the 127.0.1.1 line to match
+
+Without the `/etc/hosts` update, `sudo` stalls on name resolution.
+
+**3. Regenerate SSH host keys**
+
+    sudo rm /etc/ssh/ssh_host_*
+    sudo dpkg-reconfigure openssh-server
+
+When prompted about a modified `sshd_config`, choose **keep the local version currently installed** — the maintainer's version silently reverts any hardening.
+
+Verify afterwards:
+
+    ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub    # fingerprint and comment
+    sudo sshd -T | grep -E "permitrootlogin|passwordauthentication"
+    systemctl is-active ssh
+
+The key comment should show the new hostname, not the template's.
+
+**4. Remove orphaned NetworkManager profiles**
+
+    nmcli con show                    # look for inherited profiles with `--` under DEVICE
+    sudo nmcli con delete "Wired connection 1"
+
+An inactive profile with `autoconnect` enabled can activate itself if the intended one fails, handing you a configuration different from the one you believe is applied.
+
 
 ## Git
 

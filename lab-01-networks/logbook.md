@@ -139,7 +139,7 @@ Removing the orphan:
     sed -i '2d' ~/.ssh/authorized_keys      # remove the identified line
     chmod 600 ~/.ssh/authorized_keys        # sshd ignores the file if permissions are looser
 
-**Takeaway:** a key comment is free text and guarantees nothing. To manage `authorized_keys` at all, comments must identify user, machine and date (`alexis@ws-user01-2026-08`), or entries become unrevocable — nobody can say which one to remove. An unused authorised key is standing access nobody is tracking, which is precisely what an access review looks for. Always inspect the whole file before editing, and back it up: this file governs who can enter the machine, and `sed -i` has no undo.
+**Takeaway:** a key comment is free text and guarantees nothing. To manage `authorized_keys` at all, comments must identify user, machine and date (`alexis@ws-user01-2026-08`), or entries become unrevocable — nobody can say which one to remove. An unused authorised key is standing access nobody is tracking, which is precisely what an access review looks for. Always inspect the whole file before editing, and back it up: this file governs who can enter the machine, and `sed -i` has no undo. Consolidated as a reusable post-clone procedure in [`command-reference.md`](../command-reference.md).
 
 **Also noted:** `ss -tlnp | grep :22` shows the router listening on `0.0.0.0:22` and `[::]:22` — SSH is reachable on all four interfaces, including the external leg, over both IP versions. To be constrained in Session 2 via `ListenAddress` or firewall rules, and a reminder that IPv4-only rules leave the IPv6 plane untouched.
 
