@@ -71,3 +71,5 @@ sudo tcpdump -ni enp0s8 arp -w arp-users.pcap
 Session 1 complete. Snapshots `sesion01-segmentos-ok` and `sesion01-cliente-ok` taken with the VMs powered off.
 
 **Session 2:** persistent activation of `ip_forward`, outbound NAT with `nftables`, verification of the TTL drop to 63 as evidence of a routing hop, and the first inter-segment filtering rules.
+
+> **Note:** this lab documents the state with `ip_forward = 0` — segments isolated because the router forwarded nothing. That state no longer holds. [`lab-02-nat-firewall`](../lab-02-nat-firewall/) enables forwarding and restores isolation through explicit firewall policy instead.
