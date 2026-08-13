@@ -1,0 +1,7 @@
+Aug 13 11:58:36 lab-router sshd[1038]: error: Bind to port 22 on 10.10.20.1 failed: Cannot assign requested address.
+Aug 13 11:58:36 lab-router sshd[1038]: error: Bind to port 22 on 10.10.10.1 failed: Cannot assign requested address.
+Aug 13 11:58:36 lab-router sshd[1038]: fatal: Cannot bind any address.
+Aug 13 11:58:36 lab-router systemd[1]: ssh.service: Main process exited, code=exited, status=255/EXCEPTION
+Aug 13 11:58:36 lab-router systemd[1]: ssh.service: Failed with result 'exit-code'.
+Aug 13 11:58:36 lab-router systemd[1]: Failed to start ssh.service - OpenBSD Secure Shell server.
+Aug 13 12:06:29 lab-router systemd[1]: Starting ssh.service - OpenBSD Secure Shell server...

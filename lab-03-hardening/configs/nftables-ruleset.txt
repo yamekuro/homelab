@@ -1,0 +1,23 @@
+table ip lab-nat {
+	chain postrouting {
+		type nat hook postrouting priority srcnat; policy accept;
+		oifname "enp0s3" ip saddr 10.10.0.0/16 counter masquerade
+	}
+}
+table ip lab-filter {
+	chain forward {
+		type filter hook forward priority filter; policy drop;
+		ct state established,related counter accept
+		iifname { "enp0s8", "enp0s9", "enp0s10" } oifname "enp0s3" counter accept
+		counter log prefix "FWD-DROP: " drop
+	}
+
+	chain input {
+		type filter hook input priority filter; policy drop;
+		iifname "lo" counter accept
+		ct state established,related counter accept
+		iifname { "enp0s8", "enp0s9", "enp0s10" } tcp dport 22 counter accept
+		iifname { "enp0s8", "enp0s9", "enp0s10" } ip protocol icmp counter accept
+		counter log prefix "INPUT-DROP: " drop
+	}
+}

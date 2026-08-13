@@ -109,3 +109,5 @@ Related: `ss -tlnp` shows sshd bound to `0.0.0.0:22` — reachable from every se
 Complete and verified after reboot. Snapshot `sesion02-completa` taken on both VMs with them powered off.
 
 **Lab 03:** filter the `input` chain, restrict sshd to internal interfaces via `ListenAddress`, and deploy a host in SERVERS — currently the segment is empty, which means inter-segment isolation can only be verified against a non-existent destination rather than a live one.
+
+> **Note:** the unfiltered `input` chain and the sshd wildcard binding described above were addressed in [`lab-03-hardening`](../lab-03-hardening/).
