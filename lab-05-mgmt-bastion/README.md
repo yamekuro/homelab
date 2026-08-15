@@ -132,17 +132,17 @@ Package count fell 1571 → 1412 after the desktop purge, with `autoremove --dry
 ## Contents
 
     lab-05-mgmt-bastion/
-    ├── README.md
-    ├── logbook.md
-    ├── configs/                      [pending collection]
-    │   ├── nftables-ruleset.txt      Full ruleset, rule order relative to the drops
-    │   ├── sshd-listenaddress.txt    sshd -T, single bind after closing
-    │   ├── authorized-keys-fp.txt    Three remaining key fingerprints
-    │   └── session-recording.sh      The /etc/profile.d trigger
-    └── logs/                         [pending collection]
-        └── session-truncated.log     A session log before and after truncation
-
-Transfer route as usual: VM → `/media/sf_shared` → `mount_smbfs //agr86@192.168.0.41/vbox-shared ~/smbtest`.
+        ├── README.md
+        ├── logbook.md
+        ├── configs/
+        │   ├── authorized-keys-fingerprints.txt   Three keys remaining on the router
+        │   ├── nftables-ruleset.txt               Full ruleset with handles and rule order
+        │   ├── session-recording.sh               The /etc/profile.d trigger
+        │   └── sshd-listenaddress.txt             sshd -T, single bind after closing
+        └── logs/
+            ├── README.md                          Warning: the .log contains escape sequences
+            ├── session-logs-listing.txt           Permissions showing why truncation was possible
+            └── session-truncated.log              14234 bytes, 194 of content
 
 ## Status and continuation
 
@@ -150,8 +150,8 @@ The management segment is complete. The router is administrable only from `10.10
 
 Persistence is proven, not assumed. The router was rebooted on 2026-08-15 and every property held with no manual intervention: the ruleset returned identical (32 lines, 5 accept rules in `forward`, the DNAT rule still ahead of the drop), `nftables.service` ran `nft -f /etc/nftables.conf` to `status=0/SUCCESS`, and `ss -lnt` showed the single `10.10.99.1:22` listener. The three-layer closure survives a cold boot.
 
-One item remains open. The router still holds its own administrative key on `srv-web` from Lab 04 — it was removed as a bastion *inbound* but not *outbound*. The replacement credential from `mgmt-01` has been installed on `srv-web` and verified by fingerprint, but cannot be exercised until a forward rule lets MGMT reach SERVERS. Revoking the old key before then would leave that host reachable only through the console, so it waits for Lab 06.
+The router-as-bastion shortcut from Lab 04 is now fully undone. A forward rule permitting MGMT to reach USERS, SERVERS and DMZ on port 22 and ICMP — in one direction only — was added and verified by packet counter, and `lab-router-to-srv-web` was then revoked from `srv-web`, leaving `admin@mgmt-01` as its sole authorised credential. The router forwards packets and administers nothing.
 
-That deferral produced a finding of its own: the Lab 04 key's passphrase was never recorded and is not recoverable, so it is now an authorised credential nobody can use. Tracked in the Lab 04 logbook.
+That work produced a finding of its own: the Lab 04 key's passphrase was never recorded and is not recoverable, so before revocation it was an authorised credential nobody could use. Tracked in the Lab 04 logbook.
 
-**Lab 06:** deploy the SIEM. Wazuh with agents on every host resolves the session-recording limitation by moving events off the machine that generates them, and turns the two findings above from observations into detections. It also needs the forward rules that let MGMT reach the segments it is meant to manage — the management network cannot yet administer anything but the router.
+**Lab 06:** deploy the SIEM. Wazuh with agents on every host resolves the session-recording limitation by moving events off the machine that generates them, and turns the two findings above from observations into detections.

@@ -1,0 +1,34 @@
+table ip lab-nat { # handle 16
+	chain postrouting { # handle 1
+		type nat hook postrouting priority srcnat; policy accept;
+		oifname "enp0s3" ip saddr 10.10.0.0/16 counter packets 178 bytes 11999 masquerade # handle 3
+	}
+
+	chain prerouting { # handle 2
+		type nat hook prerouting priority dstnat; policy accept;
+		iifname "enp0s3" tcp dport 2222 dnat to 10.10.99.10:22 # handle 4
+	}
+}
+table ip lab-filter { # handle 17
+	chain forward { # handle 1
+		type filter hook forward priority filter; policy drop;
+		ct state established,related counter packets 135856 bytes 19904999 accept # handle 3
+		iifname { "enp0s8", "enp0s9", "enp0s10" } oifname "enp0s3" counter packets 53 bytes 3624 accept # handle 5
+		iifname "enp0s16" oifname "enp0s3" tcp dport { 80, 443 } counter packets 0 bytes 0 accept # handle 7
+		iifname "enp0s16" oifname "enp0s3" udp dport 53 counter packets 128 bytes 8576 accept # handle 8
+		iifname "enp0s3" oifname "enp0s16" ip daddr 10.10.99.10 tcp dport 22 accept # handle 9
+		iifname "enp0s16" oifname { "enp0s8", "enp0s9", "enp0s10" } tcp dport 22 counter packets 15 bytes 900 accept # handle 11
+		iifname "enp0s16" oifname { "enp0s8", "enp0s9", "enp0s10" } ip protocol icmp counter packets 3 bytes 252 accept # handle 13
+		counter packets 267 bytes 20116 log prefix "FWD-DROP: " drop # handle 14
+	}
+
+	chain input { # handle 2
+		type filter hook input priority filter; policy drop;
+		iifname "lo" counter packets 77 bytes 22590 accept # handle 15
+		ct state established,related counter packets 20463 bytes 3776649 accept # handle 16
+		iifname { "enp0s8", "enp0s9", "enp0s10" } ip protocol icmp counter packets 0 bytes 0 accept # handle 18
+		iifname "enp0s16" ip protocol icmp counter packets 0 bytes 0 accept # handle 19
+		iifname "enp0s16" tcp dport 22 counter packets 30 bytes 1800 accept # handle 20
+		counter packets 0 bytes 0 log prefix "INPUT-DROP: " drop # handle 21
+	}
+}

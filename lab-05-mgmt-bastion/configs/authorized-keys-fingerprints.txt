@@ -1,0 +1,3 @@
+256 SHA256:iNeqwIC08uTj5ZjN7kEtUDwy0U4MntE1AqpCPoz1k6I alexis@windows (ED25519)
+256 SHA256:EdCzwbSJFDuLdoPRnTT/+ztmPhDywzZib/Mf79P0kRU admin@mgmt-01 (ED25519)
+256 SHA256:Yhuweq31YYWIS31xqSXpcPZqkYX4rV6ChKGLUAiVJgE alexis@macbook (ED25519)
