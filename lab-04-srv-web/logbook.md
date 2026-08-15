@@ -102,11 +102,15 @@ Exit code 28 is curl's timeout, useful in scripts for distinguishing a connectio
 **Fix:** generate one, then copy it.
 
     ssh-keygen -t ed25519 -C "lab-router-to-srv-web"
-      SHA256:hLu8uneQySm4FgTAiotdBN37osE015RcsFZtD6a3hIQ
+      SHA256:hLw8wneQySm4FgTAiotdBN37osE015RcsFZtD6a3hIQ
 
-Empty passphrase, defensible for an internal key between two lab VMs, and recorded as a compromise rather than a choice.
+**Correction, recorded 2026-08-15:** this entry originally stated the key was generated with an empty passphrase, and gave the fingerprint as `hLu8une...`. Both were wrong. SSH prompts for a passphrase when the key is used, and the private key file is 464 bytes — an unencrypted Ed25519 key is around 399, so the file is encrypted. The fingerprint above is the value read from the router itself; the earlier one was a transcription error made while writing this logbook.
+
+**Consequence, discovered later:** the passphrase was not recorded anywhere and is not remembered. `ssh-keygen -y -f ~/.ssh/id_ed25519` returns `incorrect passphrase supplied to decrypt private key`. The key is therefore a valid authorised credential on `srv-web` that nobody can use — the private half is intact but permanently locked. That is an audit finding in its own right: authorised access with no operational owner. It is tracked in the Lab 05 outstanding items, where the replacement key from `mgmt-01` has already been installed alongside it.
 
 **Takeaway:** the router changing role from server to client is not a detail — it is the moment it becomes an administration point, and it is exactly the property Lab 05 then argues against. An administrative private key living on the routing device is the concrete form of the risk.
+
+A second takeaway arrived only when the key was needed again: a passphrase that is not written down at the moment of creation is a passphrase that will be lost. Two days was enough. Generating a credential and recording nothing about it produces exactly this outcome — the access remains authorised while becoming unusable, which is the worst of both properties.
 
 #### Failure 23 — `Bad archive mirror`: a content error that proved the network worked
 

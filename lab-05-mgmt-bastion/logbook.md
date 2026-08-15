@@ -22,11 +22,12 @@ Replace the router-as-bastion shortcut left by Lab 04 with a dedicated managemen
 6. External access built: `natpf1` rule on the Windows host, DNAT and forward rules on the router, ProxyJump configured on macOS.
 7. Router removed as a bastion in three layers — credential, `ListenAddress`, `input` chain — after the new path was verified end to end.
 8. Session recording installed via `/etc/profile.d`, then attacked to establish its limits.
-9. Ruleset persisted to `/etc/nftables.conf`. Snapshots `sesion04-post-purga-gnome` and `lab04-completo` — named before this work was split out of Lab 04, so the numbering in the snapshot names lags the lab numbering by one.
+9. Router rebooted and every property confirmed to hold with no manual intervention.
+10. Ruleset persisted to `/etc/nftables.conf`. Snapshots `sesion04-post-purga-gnome` and `lab04-completo` — named before this work was split out of Lab 04, so the numbering in the snapshot names lags the lab numbering by one.
 
 ### Result
 
-Administration originates from a dedicated segment and passes through a single controlled host. The router listens on one address, holds no credential from the user network, and drops SSH from the other three segments at the firewall. `mgmt-01` is single-homed, carries no desktop, and reaches the internet only on three ports. Session recording works and is demonstrably not tamper-resistant, which is the finding rather than a defect.
+Administration originates from a dedicated segment and passes through a single controlled host. The router listens on one address, holds no credential from the user network, and drops SSH from the other three segments at the firewall. `mgmt-01` is single-homed, carries no desktop, and reaches the internet only on three ports. Session recording works and is demonstrably not tamper-resistant, which is the finding rather than a defect. Every property survives a cold reboot unaided.
 
 ---
 
@@ -332,8 +333,8 @@ Real audit ships events off-host in real time, to a collector the audited user c
 ### Outstanding
 
 - [ ] Collect evidence from `mgmt-01` and `lab-router` — ruleset with rule order, `sshd -T`, key fingerprints, the `/etc/profile.d` trigger, and a truncated session log
-- [ ] **Reboot the router and verify the persisted ruleset holds** — `nftables.conf` was written and the service is `enabled`, but the machine has not been restarted since, so persistence is configured and unproven
-- [ ] **Revoke `lab-router-to-srv-web` from `srv-web`** — the router was removed as a bastion inbound but retains its own administrative key outbound, which is the Lab 04 shortcut only half undone
+- [x] ~~Reboot the router and verify the persisted ruleset holds~~ — done 2026-08-15. Ruleset identical across the reboot (32 lines, 5 accept rules in `forward`), `nftables.service` `active (exited)` having run `nft -f /etc/nftables.conf` with `status=0/SUCCESS`, and `ss -lnt` showing the single `10.10.99.1:22` listener. Persistence is proven rather than configured, and the three-layer closure survives a cold boot
+- [ ] **Revoke `lab-router-to-srv-web` from `srv-web`** — deferred to Lab 06 rather than done here. It is currently the *only* usable credential on that host, and the replacement (`admin@mgmt-01`, installed 2026-08-15 and verified by fingerprint) cannot be tested until the forward rule below exists. Revoking first would leave `srv-web` reachable only through the VirtualBox console — the same "close the old path before the new one works" error the rest of this lab avoids
 - [ ] Forward rules MGMT → USERS/SERVERS/DMZ, one direction only, and distribute the admin key to `ws-user01` and `srv-web` — the management segment cannot yet reach anything it is meant to manage
 - [ ] Rename the `Wired connection 1` NM profile on `mgmt-01` to match the `seg-mgmt` convention used on the router
 - [ ] Decide an IPv6 filtering policy, or document its absence as deliberate. Carried from Lab 03; `nftables` rules remain `table ip` only

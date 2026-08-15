@@ -117,6 +117,7 @@ This is also the lab's contribution to the method the detection phase formalises
 | `ssh lab-router` from macOS | Connects via ProxyJump through the bastion |
 | `rm` a session log | `Operation not permitted` |
 | `: >` a session log | Succeeds — 14040 bytes to 0 |
+| Ruleset after a cold reboot | Identical: 32 lines, 5 accept rules, DNAT still ahead of the drop |
 
 The passphrase prompt in row three is the diagnostic that matters. Had the router rejected the key, the prompt would have asked for the account password instead; asking for the passphrase means the key was accepted and only local decryption remained.
 
@@ -141,6 +142,10 @@ Transfer route as usual: VM → `/media/sf_shared` → `mount_smbfs //agr86@192.
 
 The management segment is complete. The router is administrable only from `10.10.99.10`, closed in credential, service and firewall. `mgmt-01` is single-homed with no unfiltered egress. Session recording is in place with its limitation demonstrated rather than assumed.
 
-Two things are configured but **not yet proven**: the persisted `nftables.conf` has not survived a reboot because the router has not been restarted since, and the router retains its own administrative key on `srv-web` from Lab 04 — it was removed as a bastion *inbound* but not *outbound*. Both are tracked in the logbook.
+Persistence is proven, not assumed. The router was rebooted on 2026-08-15 and every property held with no manual intervention: the ruleset returned identical (32 lines, 5 accept rules in `forward`, the DNAT rule still ahead of the drop), `nftables.service` ran `nft -f /etc/nftables.conf` to `status=0/SUCCESS`, and `ss -lnt` showed the single `10.10.99.1:22` listener. The three-layer closure survives a cold boot.
+
+One item remains open. The router still holds its own administrative key on `srv-web` from Lab 04 — it was removed as a bastion *inbound* but not *outbound*. The replacement credential from `mgmt-01` has been installed on `srv-web` and verified by fingerprint, but cannot be exercised until a forward rule lets MGMT reach SERVERS. Revoking the old key before then would leave that host reachable only through the console, so it waits for Lab 06.
+
+That deferral produced a finding of its own: the Lab 04 key's passphrase was never recorded and is not recoverable, so it is now an authorised credential nobody can use. Tracked in the Lab 04 logbook.
 
 **Lab 06:** deploy the SIEM. Wazuh with agents on every host resolves the session-recording limitation by moving events off the machine that generates them, and turns the two findings above from observations into detections. It also needs the forward rules that let MGMT reach the segments it is meant to manage — the management network cannot yet administer anything but the router.
