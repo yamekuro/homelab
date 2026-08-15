@@ -22,7 +22,7 @@ Replace the router-as-bastion shortcut left by Lab 04 with a dedicated managemen
 6. External access built: `natpf1` rule on the Windows host, DNAT and forward rules on the router, ProxyJump configured on macOS.
 7. Router removed as a bastion in three layers — credential, `ListenAddress`, `input` chain — after the new path was verified end to end.
 8. Session recording installed via `/etc/profile.d`, then attacked to establish its limits.
-9. Ruleset persisted to `/etc/nftables.conf`. Snapshots `sesion04-post-purga-gnome` and `lab04-completo`.
+9. Ruleset persisted to `/etc/nftables.conf`. Snapshots `sesion04-post-purga-gnome` and `lab04-completo` — named before this work was split out of Lab 04, so the numbering in the snapshot names lags the lab numbering by one.
 
 ### Result
 
@@ -317,7 +317,9 @@ This is the same discipline that validates a detection rule: fire the technique,
 
 #### Reduced surface is not always visible in `ss`
 
-Purging GNOME removed 159 packages and 700 MiB of resident memory, and changed the listening-socket count not at all. A desktop communicates over Unix sockets and D-Bus, both local to the filesystem and invisible to `ss -lnt`.
+Purging GNOME removed 159 packages and left idle memory at 291 MiB, and changed the listening-socket count not at all. A desktop communicates over Unix sockets and D-Bus, both local to the filesystem and invisible to `ss -lnt`.
+
+The package count is a measured delta, 1571 → 1412. The memory figure is not: `free -h` was run only after the purge, so 291 MiB is a reading of the end state rather than a reduction. No baseline was taken beforehand, which is a gap in the method rather than in the result — the before-and-after would have been a stronger claim and cost one command.
 
 The real reduction was elsewhere: `xserver-xorg-legacy`, a setuid root wrapper any local user could execute, on a machine with no monitor. Choosing the wrong metric would have shown no improvement and hidden a genuine privilege-escalation path being closed.
 
