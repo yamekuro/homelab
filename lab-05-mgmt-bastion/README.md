@@ -101,7 +101,11 @@ The directory is `chmod 1733` (write and traverse, no read or list) with `chattr
 
 Fourteen kilobytes of an in-progress recording, erased without root, with the protection in place.
 
-The conclusion is recorded here rather than hidden. A session log kept on the same host where the audited user holds privileges is not tamper-resistant and cannot be made so by local means. The fix is to ship events off-host in real time, which is the job of the Wazuh agent in Lab 06.
+Worse than the truncation is what follows it. `script` still held the file open at offset 14040, so its next write landed there and the filesystem filled the gap with a sparse hole. By the next day the file measured 14234 bytes again — of which **194 are content and the rest are nulls**. Size, timestamp and a clean `COMMAND_EXIT_CODE="0"` all look correct. A zero-byte log is visibly wrong; one that refills itself is not.
+
+A third failure closes the set: reading the log executes what it recorded. `script` captures control sequences verbatim, and the recorded session ended with `exit\r`, so displaying the file closed the reader's shell — four times, through `head`, `cat`, `cat -v` and `scriptreplay`. The last is not misuse: faithful replay means replaying the `exit`. Safe inspection means not treating the file as terminal output at all (`od -c`, `tr -d '\000'`).
+
+The conclusion is recorded here rather than hidden. A session log kept on the same host where the audited user holds privileges is not tamper-resistant and cannot be made so by local means — and the log itself is untrusted input to whoever investigates it. The fix is to ship events off-host in real time, which is the job of the Wazuh agent in Lab 06.
 
 This is also the lab's contribution to the method the detection phase formalises: **a control is attacked before it is trusted.** Two findings carry forward as worked detection cases once a SIEM exists — the `ws-user01` credential above, and this truncation.
 
@@ -117,6 +121,8 @@ This is also the lab's contribution to the method the detection phase formalises
 | `ssh lab-router` from macOS | Connects via ProxyJump through the bastion |
 | `rm` a session log | `Operation not permitted` |
 | `: >` a session log | Succeeds — 14040 bytes to 0 |
+| Same log, next day | 14234 bytes, of which 194 are content — the rest nulls |
+| `head` / `cat -v` / `scriptreplay` on it | Reader's shell exits — recorded control sequences execute |
 | Ruleset after a cold reboot | Identical: 32 lines, 5 accept rules, DNAT still ahead of the drop |
 
 The passphrase prompt in row three is the diagnostic that matters. Had the router rejected the key, the prompt would have asked for the account password instead; asking for the passphrase means the key was accepted and only local decryption remained.

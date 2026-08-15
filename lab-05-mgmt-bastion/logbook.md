@@ -226,27 +226,65 @@ With the pipeline proven to produce output when output exists, a subsequent empt
 
 **Takeaway:** `|| echo OK` reports OK whenever its left side finds nothing, which is not the same as nothing being wrong. This is the logbook's central point, and the direct reason positive controls matter in detection engineering: a rule that does not fire because its parser no longer matches the log format looks identical to a rule that does not fire because there is no attack.
 
-#### Failure 37 — Append-only did not protect log contents, and the test that "passed" never ran
+#### Failure 37 — Session recording defeated three ways, none fixable on the host
 
-**Symptom:** the tamper test appeared to confirm the protection.
+The mechanism built in this lab was attacked to establish its limits. Three independent failures emerged, each invalidating a different way of trusting the log.
+
+**First: the tamper test that never ran.**
 
     $ rm /var/log/session-logs/*.log
     rm: cannot remove '/var/log/session-logs/*.log': No such file or directory
 
-**Diagnosis:** that is not the protection speaking. The `1733` directory permission denies *read*, so the shell could not expand the glob; it passed the literal string to `rm`, which found no file by that name. The control was never exercised. Re-run with an explicit filename it behaved correctly:
+That is not the protection speaking. The `1733` directory permission denies *read*, so the shell could not expand the glob; it passed the literal string to `rm`, which found no file by that name. The control was never exercised. Re-run with an explicit filename it behaved correctly:
 
     $ rm /var/log/session-logs/vboxuser-20260814-121102-1467.log
     rm: cannot remove '...': Operation not permitted
 
-**The real gap:** `chattr +a` on a *directory* prevents deleting or renaming entries. It says nothing about the contents of files inside it, and I had wrongly stated that newly created files would inherit the restriction. Each log is owned by the session user with write permission, because that is how `script` creates it:
+**Second: the contents are writable, and the truncation hides itself.**
+
+`chattr +a` on a *directory* prevents deleting or renaming entries. It says nothing about the contents of files inside it, and each log is owned by the session user with write permission, because that is how `script` creates it. Truncating in place needs no privilege:
 
     $ wc -c ...-1467.log      → 14040
     $ : > ...-1467.log
     $ wc -c ...-1467.log      → 0
 
-Fourteen kilobytes of an in-progress recording, erased without root, with the attribute set.
+The important part came later. `script` still held the file open with its descriptor at offset 14040, so its next write landed there and the filesystem filled the gap with a sparse hole. Checked the following day:
 
-**Takeaway:** host-local session logging is not tamper-resistant against a user holding privileges on that host, and cannot be made so by local means. Ship events off-host in real time — the job of the Wazuh agent in Lab 06. And once again, a check that appeared to pass had verified nothing: the glob failure and the false OK of Failure 36 are the same error wearing different clothes.
+    $ wc -c ...-1467.log                        → 14234
+    $ tr -d '\000' < ...-1467.log | wc -c       → 194
+
+    $ od -c ...-1467.log | tail
+    0000000  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0  \0
+    *
+    0033320  \0  \0  \0  \0  \0   c   l   e   a   r  \r  \n
+    ...
+    Script done on 2026-08-14 12:25:52+01:00 [COMMAND_EXIT_CODE="0"]
+
+**14040 of 14234 bytes are nulls. 194 bytes — 1.4% — are content.** The file regained a plausible size, kept a coherent timestamp, and closed cleanly with exit code 0. Everything an integrity check based on `ls` would look at says the log is intact.
+
+That is worse than truncation to zero. A zero-byte log is visibly wrong; a log that refills itself with nulls is not.
+
+**Third: reading the log executes what it recorded.**
+
+`script` records the terminal byte for byte, control sequences included. Displaying that file sends those bytes to the reader's terminal, which interprets them. The recorded session ended with `exit\r`, so:
+
+    $ head -3 session-truncated.log
+    logout
+
+The shell exited. This happened four times, with `head`, `cat`, `cat -v` — which escapes colour codes but not `\r` — and with `scriptreplay`, the tool built for the purpose. `scriptreplay` is not misuse: faithful replay means faithfully replaying the `exit`.
+
+Safe inspection means not treating the file as terminal output:
+
+    od -c session-truncated.log | tail -20
+    tr -d '\000' < session-truncated.log | wc -c
+
+(`xxd` would also work but is absent on a minimal install — it ships with `vim-common`. Third instance of that gap this lab, after `curl` and `openssh-server`.)
+
+**Takeaway:** host-local session logging is not tamper-resistant against a user holding privileges on that host, and cannot be made so by local means. Every hardening measure raises the cost; none closes it. Ship events off-host in real time — the job of the Wazuh agent in Lab 06.
+
+The third failure is the one that generalises furthest. A log containing attacker-controlled bytes is a hazard to whoever investigates it, because the investigation tool is a terminal. That is terminal escape injection, and it turns a log from evidence into a delivery mechanism. Reaching for `cat` on an untrusted log is a habit worth breaking before the SIEM phase, not after.
+
+And once again, a check that appeared to pass had verified nothing: the glob failure and the false OK of Failure 36 are the same error wearing different clothes. Partial mitigation was worse than none — `cat -v` was adopted *because* of the first incident and failed identically, granting confidence without protection.
 
 ---
 
@@ -328,7 +366,15 @@ The real reduction was elsewhere: `xserver-xorg-legacy`, a setuid root wrapper a
 
 A log stored on the machine where the audited user holds privileges can be truncated in one command. Directory-level `chattr +a` prevents deletion and renaming while leaving file contents writable, and the file is owned by the user being recorded.
 
+Worse than the truncation is what follows it. Because the writing process keeps its descriptor at the old offset, the file refills with nulls and regains a plausible size — 14234 bytes of which 194 are content. Size, timestamp and clean exit code all look correct. An integrity check that compares file sizes passes.
+
 Real audit ships events off-host in real time, to a collector the audited user cannot write to. Every local hardening measure raises the cost of tampering; none of them closes it.
+
+#### A log is untrusted input, and a terminal is an interpreter
+
+`script` records control sequences verbatim. Displaying such a file sends those bytes to the reader's terminal, which acts on them — a recorded `exit` closes the reader's shell, four times over, including through `cat -v` and `scriptreplay`.
+
+Generalised: any log containing attacker-controlled text is a hazard to whoever reads it, because the reading tool is a terminal that interprets escape sequences. The investigation becomes the delivery mechanism. `od -c`, `tr -d`, or a viewer that does not interpret escapes are the safe options; `cat` on an untrusted log is a habit to break before the SIEM phase rather than after.
 
 ### Outstanding
 
