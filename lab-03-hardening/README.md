@@ -105,3 +105,5 @@ Complete and verified after reboot. Snapshot `sesion03-completa` on both VMs, po
 **Lab 04:** deploy a host in SERVERS. The segment is still empty, which means inter-segment isolation can only be tested against a non-existent destination. A real host also produces logs worth collecting — the first step toward centralised logging.
 
 Install it without a desktop environment. This lab spent most of its time removing one.
+
+> **Note:** the empty SERVERS segment described above was addressed in [`lab-04-srv-web`](../lab-04-srv-web/).
