@@ -286,6 +286,35 @@ The third failure is the one that generalises furthest. A log containing attacke
 
 And once again, a check that appeared to pass had verified nothing: the glob failure and the false OK of Failure 36 are the same error wearing different clothes. Partial mitigation was worse than none — `cat -v` was adopted *because* of the first incident and failed identically, granting confidence without protection.
 
+#### Failure 38 — The IPv6 table vanished in a reboot, and the check meant to catch it counted the wrong thing
+
+**Symptom:** an `ip6` table with three drop-policy chains was created and verified present. Some time later it was gone:
+
+    $ sudo nft list tables
+    table ip lab-nat
+    table ip lab-filter
+
+**Diagnosis:** not a persistence failure. `nftables.service` had done its job:
+
+    Active: active (exited) since Sun 2026-08-16 14:20:12 CEST
+    Process: 313 ExecStart=/usr/sbin/nft -f /etc/nftables.conf (code=exited, status=0/SUCCESS)
+
+The router had rebooted at 14:20 and reloaded the ruleset from disk with complete success. The file simply did not contain the `ip6` table, because the table had been created in memory and never written before the reboot — and the `tee` that was supposed to persist it ran *afterwards*, faithfully capturing a state from which the table had already disappeared.
+
+**Cause:** persistence captures the state at the moment it runs. Running the command is not the same as saving the intended content, and a reboot in between inverts the result silently.
+
+**Second error, in the verification:** the check chosen to confirm the file was `grep -c 'lab-filter6' /etc/nftables.conf`, with an expected value of 4 — the table plus three chains. It returned 1 even once the table was correctly saved, because the string appears only in the table declaration; the chains are named `input`, `forward` and `output`, without the table name anywhere in them. The expected value was invented, and a correct result was read as a failure.
+
+**Fix:** recreate, verify presence in memory, persist, then verify the file with a check that counts something real:
+
+    sudo nft list tables                          → three tables, ip6 included
+    sudo nft list ruleset | sudo tee /etc/nftables.conf > /dev/null
+    grep -c 'policy drop' /etc/nftables.conf      → 5
+
+Five is the three `ip6` chains plus `input` and `forward` in `lab-filter`. Confirmed across a reboot afterwards.
+
+**Takeaway:** two distinct errors sharing one shape. Persisting without verifying the file assumes the command captured what was intended; verifying against a number pulled from expectation rather than from the data turns a correct state into a false alarm. Both are the failure mode of Failure 36 — a check that reports on itself rather than on the thing being checked — arriving from two new directions.
+
 ---
 
 ### Concepts consolidated
@@ -376,12 +405,22 @@ Real audit ships events off-host in real time, to a collector the audited user c
 
 Generalised: any log containing attacker-controlled text is a hazard to whoever reads it, because the reading tool is a terminal that interprets escape sequences. The investigation becomes the delivery mechanism. `od -c`, `tr -d`, or a viewer that does not interpret escapes are the safe options; `cat` on an untrusted log is a habit to break before the SIEM phase rather than after.
 
+#### A protocol family with no addresses is not a filtered one
+
+IPv6 was disabled on all five router interfaces through NetworkManager (`ipv6.method disabled`), so no interface carried even a link-local address and there was nothing for a filter to act on. But `net.ipv6.conf.all.disable_ipv6` was `0` — the kernel had IPv6 enabled throughout, and the absence rested entirely on every profile carrying the right setting.
+
+That is the same fragility as Failure 28, where a new interface arrived without firewall rules and traffic died in silence. An interface added without `ipv6.method disabled` would come up with link-local connectivity to its segment neighbours, and no `nftables` rule would be looking at it — this time without any symptom at all.
+
+An `ip6` table with `policy drop` on `input`, `forward` and `output` covers what exists and what may appear, which is the same default-deny reasoning applied to the rest of the lab. It carries no rules; the policy does the work.
+
+It also cannot be exercised. With no IPv6 address anywhere, no traffic can be generated to increment a counter, so the positive control used everywhere else in this lab is unavailable here. That is the honest state of the verification rather than a gap in method, and worth recording as such instead of implying a test that was never run.
+
 ### Outstanding
 
 - [x] ~~Collect evidence from `mgmt-01` and `lab-router`~~ — done 2026-08-16. Ruleset with handles and rule order, `sshd -T` showing the single bind, the three remaining key fingerprints, the `/etc/profile.d` trigger, the session-log listing with permissions, and the truncated log itself. Transferred by `scp` through the bastion rather than a shared folder, since neither VM has Guest Additions
 - [x] ~~Reboot the router and verify the persisted ruleset holds~~ — done 2026-08-15. Ruleset identical across the reboot (32 lines, 5 accept rules in `forward`), `nftables.service` `active (exited)` having run `nft -f /etc/nftables.conf` with `status=0/SUCCESS`, and `ss -lnt` showing the single `10.10.99.1:22` listener. Persistence is proven rather than configured, and the three-layer closure survives a cold boot
 - [x] ~~Forward rules MGMT → USERS/SERVERS/DMZ, one direction only~~ — done 2026-08-16. Two rules inserted before the terminating drop, permitting port 22 and ICMP outbound from `enp0s16` only; the reverse direction is covered by `established,related` alone, so a compromised host in USERS gains no route to the bastion. Both verified by packet counter under live traffic. The counters were the second attempt: the rules were first created without `counter`, which works but leaves no way to prove it — the quiet variant of Failure 29
 - [x] ~~Revoke `lab-router-to-srv-web` from `srv-web`~~ — done 2026-08-16, once the forward rule made the replacement testable. `admin@mgmt-01` is now the sole authorised credential on that host. The admin key was also distributed to `ws-user01`, which required typing it at the console: the same circular lockout as Failure 32, and this time unfixable by reversing direction, because the new forward rule deliberately blocks USERS → MGMT
-- [ ] Rename the `Wired connection 1` NM profile on `mgmt-01` to match the `seg-mgmt` convention used on the router
-- [ ] Decide an IPv6 filtering policy, or document its absence as deliberate. Carried from Lab 03; `nftables` rules remain `table ip` only
+- [x] ~~Rename the `Wired connection 1` NM profile on `mgmt-01`~~ — done 2026-08-16, now `seg-mgmt-host`. Named for the bastion's interface rather than the router's leg, which keeps `seg-mgmt` unambiguous. `autoconnect` and `ipv4.method manual` confirmed unchanged afterwards
+- [x] ~~Decide an IPv6 filtering policy~~ — done 2026-08-16. An `ip6` table with `policy drop` on all three chains, persisted and confirmed across a reboot. See Failure 38 and the concept note; IPv6 was already absent from every interface, but only because each profile said so
 - [ ] Review `alexis@windows`, present in `authorized_keys` on both the router and `ws-user01` — a path that bypasses the bastion and leaves no trace on it. Defensible, since the Windows host runs the hypervisor and already controls every VM, but it should be a recorded decision rather than a leftover
