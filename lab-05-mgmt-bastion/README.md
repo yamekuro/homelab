@@ -16,6 +16,7 @@ The lab's most useful material came not from what worked but from attacking what
 | External reach without a second unfiltered egress | NAT port-forward → DNAT on the router, not a second adapter |
 | Router removed as bastion | Credential revoked, `ListenAddress` restricted, `input` chain closed |
 | Session activity recorded on the bastion | `script` via `/etc/profile.d`, with its limitation demonstrated |
+| IPv6 denied by policy, not by absence | `ip6` table with `policy drop` on all three chains |
 
 ## Building the segment
 
@@ -149,6 +150,8 @@ Package count fell 1571 → 1412 after the desktop purge, with `autoremove --dry
 The management segment is complete. The router is administrable only from `10.10.99.10`, closed in credential, service and firewall. `mgmt-01` is single-homed with no unfiltered egress. Session recording is in place with its limitation demonstrated rather than assumed.
 
 Persistence is proven, not assumed. The router was rebooted on 2026-08-15 and every property held with no manual intervention: the ruleset returned identical (32 lines, 5 accept rules in `forward`, the DNAT rule still ahead of the drop), `nftables.service` ran `nft -f /etc/nftables.conf` to `status=0/SUCCESS`, and `ss -lnt` showed the single `10.10.99.1:22` listener. The three-layer closure survives a cold boot.
+
+IPv6 is now denied rather than merely absent. Every router interface had it disabled through NetworkManager, but the kernel had it enabled and the absence rested on each profile carrying the right setting — the same fragility that left `enp0s16` without firewall rules when it was created. An `ip6` table with `policy drop` on `input`, `forward` and `output` covers any interface that appears without it. The table carries no rules and cannot be exercised, because no interface holds an IPv6 address to generate traffic with; that is the state of the verification, recorded rather than implied.
 
 The router-as-bastion shortcut from Lab 04 is now fully undone. A forward rule permitting MGMT to reach USERS, SERVERS and DMZ on port 22 and ICMP — in one direction only — was added and verified by packet counter, and `lab-router-to-srv-web` was then revoked from `srv-web`, leaving `admin@mgmt-01` as its sole authorised credential. The router forwards packets and administers nothing.
 
