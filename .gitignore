@@ -12,3 +12,5 @@ id_*
 # System
 .DS_Store
 homelab.pdf
+wazuh-install-files.tar
+*-paswords.txt
