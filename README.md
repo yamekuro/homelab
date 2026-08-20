@@ -56,11 +56,21 @@ The most useful material came from attacking what had just been built. The sessi
 
 Covers: ProxyJump and why a jump host never sees the credential, one-directional forward rules, rule placement in an ordered ruleset, positive controls, and terminal escape injection.
 
+### [`lab-06-siem`](lab-06-siem/) — SIEM deployment and first detections
+
+A dedicated SIEM segment, Wazuh on `siem-01`, agents on every host, and the first detection rules written against the environment's own telemetry.
+
+The rules were the smaller part of the work. Firewall events arrived decoded and generated nothing, because Wazuh's container rule for them sits at level 0 — a freshly installed SIEM is close to blind to anything specific to its environment until someone writes the rule. And the technique that motivated the whole lab, destroying a session log, resisted five auditd variants and defeated file integrity monitoring by volume: 287 alerts in twenty minutes, none of them the truncation. That boundary is measured rather than assumed, and recorded in [`coverage.md`](coverage.md).
+
+Covers: rule and decoder pipeline, correlation with `frequency` and `timeframe`, MITRE ATT&CK mapping, why syscall-based detection depends on how an action is invoked, and detecting the absence of data rather than the act that removed it.
+
 ---
 
 ## Reference
 
 **[`curriculum.md`](curriculum.md)** — the phased plan: thirty modules from networking fundamentals through detection engineering, cloud, OT/ICS and AI security, with scope decisions recorded for each.
+
+**[`coverage.md`](coverage.md)** — detection coverage matrix: which techniques the environment can see, which it cannot, and the reasoning behind each. Cumulative across labs.
 
 **[`command-reference.md`](command-reference.md)** — running reference of every command used across the lab, grouped by purpose rather than by session, with the reasoning behind each one.
 

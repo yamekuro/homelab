@@ -158,3 +158,5 @@ The router-as-bastion shortcut from Lab 04 is now fully undone. A forward rule p
 That work produced a finding of its own: the Lab 04 key's passphrase was never recorded and is not recoverable, so before revocation it was an authorised credential nobody could use. Tracked in the Lab 04 logbook.
 
 **Lab 06:** deploy the SIEM. Wazuh with agents on every host resolves the session-recording limitation by moving events off the machine that generates them, and turns the two findings above from observations into detections.
+
+> **Note:** the off-host logging gap described above was partially addressed in [`lab-06-siem`](../lab-06-siem/) — collected events are now beyond a local attacker's reach, but session logs remain outside the collection path.
