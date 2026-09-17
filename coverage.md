@@ -8,7 +8,7 @@ between states as detection is built. A row marked **not covered** is not a
 gap to be embarrassed about — it is a gap that has been measured, which is the
 point of keeping the matrix at all.
 
-*Last updated: 2026-08-20 · Lab 06*
+*Last updated: 2026-09-16 · Lab 08*
 
 ---
 
@@ -33,6 +33,10 @@ on real traffic is not counted as detected — the two are different claims.
 |---|---|---|---|---|---|
 | T1046 | Network Service Discovery | Discovery | **Detected** | 100100 (level 8) | 2026-08-19 |
 | T1046 | Network Service Discovery — repeated, same source | Discovery | **Detected** | 100101 (level 10) | 2026-08-19 |
+| T1046 | Network Service Discovery — blocked traffic from DMZ | Discovery | **Detected** | 100103 (level 10) | 2026-09-14 |
+| T1046 | Network Service Discovery — port scan from DMZ | Discovery | **Detected** | 100104 (level 12) | 2026-09-14 |
+| T1595.002 | Active Scanning: Vulnerability Scanning — web path scan | Reconnaissance | **Detected** | 100105 (level 10) | 2026-09-16 |
+| T1595.002 | Active Scanning: Vulnerability Scanning — scanner User-Agent | Reconnaissance | **Partial** | 100106 (level 12) | 2026-09-16 |
 | T1562.001 | Impair Defenses: Disable or Modify Tools | Defense Evasion | **Detected** | 100102 (level 10) | 2026-08-20 |
 | T1070.002 | Clear Linux or Mac System Logs | Defense Evasion | **Partial** | — | 2026-08-20 |
 | T1078 | Valid Accounts | Persistence / Lateral Movement | **Not covered** | — | — |
@@ -56,6 +60,35 @@ measured retransmission rate.
 Both alerts still fire — Wazuh does not suppress the individual rules when a
 composite one matches. Suppressing them means dropping 100100 to level 0, which
 would cost the per-port detail. That trade-off has not been made.
+
+Two further T1046 rules were added in Lab 08, written from a real Kali scan
+rather than a synthetic probe. Rule 100103 fires on any blocked traffic
+originating in the DMZ — the attacker's zone, where outbound traffic to other
+internal segments is suspicious by definition. Rule 100104 correlates it. The
+raw rule produced **45,397** alerts from a single `nmap -p-` plus 12 GB of disk;
+the progression 45,397 → ~3,000 → 1 across two tuning iterations is documented in
+the Lab 08 writeup. A detection that fires per-packet is a liability an attacker
+can turn against the SIEM by scanning to fill it.
+
+### T1595.002 — Active Scanning: Vulnerability Scanning
+
+Rule 100105 detects web path scanning — repeated 404s from one source in a short
+window. Wazuh's stock rule (31151) covers this at 14 errors in 90 seconds, tuned
+for a public server; 100105 lowers the threshold to four in ten, appropriate to
+an environment where nobody browses. Verified on the fourth 404 of a live scan.
+
+Rule 100106 is **partial** on purpose. It matches scanner names in the
+User-Agent (`nmap`, `sqlmap`, `nikto` and others) and catches the careless
+attacker who does not mask the string. One flag defeats it, so it is documented
+as low-confidence and paired with the behavioural rules above, which watch what
+the attacker does rather than what they declare.
+
+The intended implementation — a custom decoder extracting the User-Agent as a
+queryable field — could not be built. Wazuh stops at the first matching parent
+decoder, and the shipped nginx decoder consumes the line before any custom
+sibling runs. This is a known open issue (wazuh/wazuh#32038). The `<match>` rule
+is the correct workaround on this platform, not a shortcut, and the
+field-extraction path is recorded as blocked with a citable cause.
 
 ### T1562.001 — Impair Defenses
 
