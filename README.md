@@ -64,6 +64,24 @@ The rules were the smaller part of the work. Firewall events arrived decoded and
 
 Covers: rule and decoder pipeline, correlation with `frequency` and `timeframe`, MITRE ATT&CK mapping, why syscall-based detection depends on how an action is invoked, and detecting the absence of data rather than the act that removed it.
 
+### [`lab-07-windows-endpoint`](lab-07-windows-endpoint/) — Windows endpoint and Sysmon telemetry
+
+A Windows 11 host in the USERS segment, instrumented with Sysmon and reporting to the SIEM. The environment had been Debian-only for six labs, which left it without the event source most enterprise detection is built on.
+
+No detection rules were written here — there was nothing to detect yet. What the lab did produce is a triage walkthrough on real alerts, and the observation that priority follows impact rather than severity number: a level 10 blocked scan matters less than a level 3 privilege escalation on the bastion. Filtering rule 5402 reconstructed an entire administrative session — twenty-five privileged commands across three machines, including edits to the SIEM's own rules. Read without context, that is what an intrusion looks like.
+
+Covers: Sysmon configuration as the actual product, process ancestry as the basis of endpoint detection, `eventchannel` sources in the Wazuh agent, reading `alerts.json` with `jq`, and alert triage as sequence reconstruction rather than event reading.
+
+### [`lab-08-attacker-detection`](lab-08-attacker-detection/) — Attacker machine and paired detection
+
+A Kali machine in the DMZ, and the first full purple cycle: attack the environment for real, then write the detections from what the attacks actually look like.
+
+Five rules across network and application layers, every one fired by a live attack rather than a pasted log line. The most useful result was a tuning problem: rule 100103 turned a single `nmap -p-` into **45,397 alerts** and 12 GB of disk — a detection an attacker could trigger deliberately to blind the SIEM. Correlation cut it to roughly 3,000; suppression cut that to 1. Each figure measured against a real scan.
+
+An intended custom decoder could not be built: Wazuh stops at the first matching parent decoder, so a custom sibling never runs. Documented with the upstream issue, and the `<match>` workaround recorded as correct for this platform rather than as a shortcut.
+
+Covers: segmentation verified by an adversary rather than by config review, deliberate minimal firewall openings, correlation with `frequency`/`timeframe`/`ignore`, threshold calibration as an environment-specific judgement, and why behavioural detection outlasts signature detection.
+
 ---
 
 ## Reference
